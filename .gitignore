@@ -19,3 +19,9 @@ build/
 .env.*
 !.env.example
 !.env.sample
+
+# Local signing credentials
+*.p12
+*.p8
+*.mobileprovision
+*.provisionprofile

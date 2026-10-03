@@ -16,6 +16,12 @@ final class HUDController {
     private var panel: NSPanel?
     private var hideTask: Task<Void, Never>?
 
+    func hide() {
+        hideTask?.cancel()
+        hideTask = nil
+        panel?.orderOut(nil)
+    }
+
     func show(_ mode: Mode) {
         hideTask?.cancel()
 
@@ -78,7 +84,7 @@ final class HUDController {
         let screen = NSScreen.main ?? NSScreen.screens.first
         guard let visible = screen?.visibleFrame else { return }
         let x = visible.midX - panel.frame.width / 2
-        let y = visible.minY + 80
+        let y = visible.minY + 120
         panel.setFrameOrigin(NSPoint(x: x, y: y))
     }
 }

@@ -25,7 +25,7 @@ struct MenuBarView: View {
                 }
                 .buttonStyle(.borderedProminent)
                 .frame(maxWidth: .infinity)
-            } else if appState.phase != .processing && !appState.hasFailedRecording {
+            } else if appState.phase != .processing {
                 Button("音声入力を開始") {
                     Task { await appState.startRecording() }
                 }
@@ -44,18 +44,6 @@ struct MenuBarView: View {
                 }
                 .disabled(appState.isCancelling)
             }
-            if appState.hasFailedRecording {
-                HStack {
-                    Button("前の録音を再試行") {
-                        Task { await appState.retryFailedRecording() }
-                    }
-                    Button("録音を破棄", role: .destructive) {
-                        Task { await appState.discardFailedRecording() }
-                    }
-                }
-                .disabled(appState.phase == .processing)
-            }
-
             if !appState.lastOutput.isEmpty {
                 VStack(alignment: .leading, spacing: 6) {
                     Text("直前の入力")

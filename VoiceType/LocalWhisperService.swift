@@ -85,13 +85,17 @@ final class LocalWhisperService {
     }
 
     func finishTranscription() async throws -> String {
+        // An immediate stop can leave no samples. Silent recordings do not need
+        // to wait for the model download or an in-flight recognition operation.
+        guard let audio = samples?.snapshot(),
+              RecognitionAudio.activeRange(in: audio, sampleRate: WhisperKit.sampleRate) != nil else {
+            throw VoiceTypeError.noSpeech
+        }
         // Finish the in-flight decoder before using the same model again.
         await streamingTask?.value
         streamingTask = nil
+        try Task.checkCancellation()
         try await prepare()
-        guard let audio = samples?.snapshot(), !audio.isEmpty else {
-            throw VoiceTypeError.message("録音データを取得できませんでした")
-        }
         let decodedTailSeconds = Double(lastDecodedSampleCount) / Double(WhisperKit.sampleRate)
         let quietTail = lastDecodedSampleCount > 0 &&
             audio.count - lastDecodedSampleCount <= WhisperKit.sampleRate / 2 &&
@@ -101,7 +105,7 @@ final class LocalWhisperService {
             : try await recognize(audio, from: transcript.confirmedEnd)
         let text = transcript.finalText(with: remaining)
         guard !text.isEmpty else {
-            throw VoiceTypeError.message("発話を認識できませんでした。もう一度お話しください")
+            throw VoiceTypeError.noSpeech
         }
 
         return text

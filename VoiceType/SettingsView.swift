@@ -60,6 +60,12 @@ struct SettingsView: View {
             }
 
             Section("OpenAI / AI整形") {
+                Text("ご自身のOpenAI APIキーを入力してください。キーはこのMacのKeychainに保存され、APIの利用料金はご自身のOpenAIアカウントに請求されます。")
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+
+                Link("OpenAI APIキーを作成", destination: URL(string: "https://platform.openai.com/api-keys")!)
+
                 SecureField("sk-...", text: $apiKey)
                     .textFieldStyle(.roundedBorder)
 
@@ -80,7 +86,7 @@ struct SettingsView: View {
 
                 Toggle("文字起こし後にAIで自然な文章へ整形", isOn: $polishText)
 
-                Text("ローカル文字起こしだけならAPIキーは不要です。AI整形をONにした場合のみ、文字起こし済みテキストをOpenAIへ送信します。APIキーが未設定なら整形をスキップして生の文字起こし結果を使います。")
+                Text("ローカル文字起こしだけならAPIキーは不要です。AI整形がONでキーを設定すると、次の音声入力から文字起こし済みテキストとユーザー辞書をOpenAIへ送信します。APIキーが未設定なら整形をスキップして生の文字起こし結果を使います。")
                     .font(.caption)
                     .foregroundStyle(.secondary)
             }

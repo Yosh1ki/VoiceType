@@ -78,13 +78,6 @@ struct MainView: View {
             if let error = history.error {
                 Label(error, systemImage: "exclamationmark.triangle").foregroundStyle(.red)
             }
-            if appState.hasFailedRecording {
-                HStack {
-                    Text("前の録音を認識できませんでした。")
-                    Button("再試行") { Task { await appState.retryFailedRecording() } }
-                    Button("破棄") { Task { await appState.discardFailedRecording() } }
-                }.disabled(appState.phase == .processing)
-            }
             HStack {
                 Image(systemName: "magnifyingglass").foregroundStyle(.secondary)
                 TextField("文章やアプリ名で履歴を検索", text: $query).textFieldStyle(.plain)

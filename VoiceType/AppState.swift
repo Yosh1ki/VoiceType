@@ -34,7 +34,6 @@ final class AppState: ObservableObject {
     @Published var localModelStatus: String = "未読み込み"
     @Published var isPreparingLocalModel = false
     @Published var hotKeyAvailable = false
-    @Published var hasFailedRecording = false
     @Published var isCancelling = false
     @Published var lastTimingSummary = ""
     @Published var recordingShortcut: RecordingShortcut = .capsLock {
@@ -63,7 +62,6 @@ final class AppState: ObservableObject {
         let provider: TranscriptionProvider
         let audioURL: URL?
     }
-    private var failedRecording: PendingRecording?
     private var insertionTarget: TextInserter.Target?
     private var processingTask: Task<Void, Never>?
     private var recordingTimeoutTask: Task<Void, Never>?
@@ -131,10 +129,6 @@ final class AppState: ObservableObject {
 
     func startRecording() async {
         guard !isStartingRecording, processingTask == nil, activeProvider == nil else { return }
-        guard failedRecording == nil else {
-            showError("前の録音を再試行するか破棄してください")
-            return
-        }
         isStartingRecording = true
         defer { isStartingRecording = false }
         let start = ProcessInfo.processInfo.systemUptime
@@ -212,25 +206,6 @@ final class AppState: ObservableObject {
         }
     }
 
-    func retryFailedRecording() async {
-        guard let recording = failedRecording, processingTask == nil else { return }
-        phase = .processing
-        hud.show(.processing)
-        processingTask = Task { [weak self] in
-            await self?.process(recording, stoppedAt: ProcessInfo.processInfo.systemUptime)
-        }
-        await processingTask?.value
-    }
-
-    func discardFailedRecording() async {
-        guard let recording = failedRecording, processingTask == nil else { return }
-        await discard(recording)
-        failedRecording = nil
-        hasFailedRecording = false
-        phase = .idle
-        hud.show(.done("録音を破棄しました"))
-    }
-
     func cancelRecording() async {
         guard let provider = activeProvider else { return }
         recordingTimeoutTask?.cancel()
@@ -276,12 +251,13 @@ final class AppState: ObservableObject {
                 transcript = try await client.transcribe(audioURL: audioURL)
             }
             try Task.checkCancellation()
+            guard !transcript.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty else {
+                throw VoiceTypeError.noSpeech
+            }
             let transcriptionSeconds = ProcessInfo.processInfo.systemUptime - transcriptionStarted
             lastTranscript = transcript
             await discard(recording)
             transcriptionComplete = true
-            failedRecording = nil
-            hasFailedRecording = false
 
             let shouldPolish = UserDefaults.standard.object(forKey: PreferenceKeys.polishText) as? Bool ?? true
             let hasAPIKey = KeychainStore.loadAPIKey()?.isEmpty == false
@@ -342,20 +318,17 @@ final class AppState: ObservableObject {
             insertionTarget = nil
             performanceLog.info("\(recording.provider.rawValue, privacy: .public): \(self.lastTimingSummary, privacy: .public)")
         } catch {
+            if !transcriptionComplete { await discard(recording) }
+            insertionTarget = nil
             if Task.isCancelled {
-                await discard(recording)
-                failedRecording = nil
-                hasFailedRecording = false
-                insertionTarget = nil
                 phase = .idle
                 hud.show(.done("処理を中止しました"))
-            } else if transcriptionComplete {
-                showError(error.localizedDescription)
+            } else if case VoiceTypeError.noSpeech = error {
+                phase = .idle
+                hud.hide()
             } else {
-                failedRecording = recording
-                hasFailedRecording = true
-                if recording.provider == .local { localModelStatus = "エラー" }
-                showError("\(error.localizedDescription) — 再試行できます")
+                if !transcriptionComplete, recording.provider == .local { localModelStatus = "エラー" }
+                showError(error.localizedDescription)
             }
         }
     }
